@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import '../../models/worker.dart';
 import '../../utils/constants.dart';
 import '../../services/firestore_service.dart';
@@ -28,13 +30,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
   late TextEditingController _locationController;
-  late TextEditingController _hourlyRateController;
   late TextEditingController _descriptionController;
-  late TextEditingController _skillsController;
   late TextEditingController _yearsOfExperienceController;
-  late String _selectedCategory;
   late String _selectedLevel;
   bool _isLoading = false;
+  bool _isGettingLocation = false;
+  double? _savedLatitude;
+  double? _savedLongitude;
 
   @override
   void initState() {
@@ -46,18 +48,94 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _emailController = TextEditingController(text: data['email'] ?? currentUser?.email ?? '');
     _phoneController = TextEditingController(text: data['phone'] ?? '');
     _locationController = TextEditingController(text: data['location'] ?? '');
-    _hourlyRateController = TextEditingController(text: (data['hourlyRate'] ?? 0).toString());
     _descriptionController = TextEditingController(text: data['description'] ?? '');
-    _skillsController = TextEditingController(
-      text: data['skills'] != null 
-          ? (data['skills'] as List).join(', ')
-          : '',
-    );
     _yearsOfExperienceController = TextEditingController(
       text: (data['yearsOfExperience'] ?? 0).toString(),
     );
-    _selectedCategory = data['category'] ?? '';
     _selectedLevel = data['level'] ?? 'newbie';
+    _savedLatitude = (data['latitude'] as num?)?.toDouble();
+    _savedLongitude = (data['longitude'] as num?)?.toDouble();
+  }
+
+  Future<void> _setLocationFromGps() async {
+    setState(() => _isGettingLocation = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please enable location services'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location permission is required to use GPS'),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+          return;
+        }
+      }
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+      if (placemarks.isNotEmpty) {
+        Placemark p = placemarks.first;
+        // Prefer locality (city), then subAdministrativeArea, then administrativeArea
+        String city = p.locality ?? p.subAdministrativeArea ?? p.administrativeArea ?? '';
+        if (city.isEmpty && p.country != null) city = p.country!;
+        if (city.isNotEmpty) {
+          _locationController.text = city;
+          if (mounted) {
+            setState(() {
+              _savedLatitude = position.latitude;
+              _savedLongitude = position.longitude;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Location set to: $city'),
+                backgroundColor: AppColors.secondary,
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Could not get city name. Enter it manually.'),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Location error: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isGettingLocation = false);
+    }
   }
 
   @override
@@ -66,9 +144,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     _locationController.dispose();
-    _hourlyRateController.dispose();
     _descriptionController.dispose();
-    _skillsController.dispose();
     _yearsOfExperienceController.dispose();
     super.dispose();
   }
@@ -78,28 +154,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    // Validate category
-    if (_selectedCategory.isEmpty) {
+    // Location must be set via GPS (field is read-only)
+    if (_locationController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select a service category'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
-    // Validate skills
-    List<String> skills = _skillsController.text
-        .split(',')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-    
-    if (skills.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please add at least one skill'),
+          content: Text('Please set your location using the Use GPS button'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -123,11 +182,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         profileImage: widget.workerData['profileImage'] ?? 
                       currentUser.photoURL ??
                       'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_nameController.text.trim())}&background=2563EB&color=fff',
-        category: _selectedCategory,
-        hourlyRate: double.tryParse(_hourlyRateController.text.trim()) ?? 0,
+        hourlyRate: (widget.workerData['hourlyRate'] as num?)?.toDouble(),
         description: _descriptionController.text.trim(),
-        skills: skills,
+        skills: const [], // Skills are per gig, not on worker profile
         location: _locationController.text.trim(),
+        latitude: _savedLatitude ?? (widget.workerData['latitude'] as num?)?.toDouble(),
+        longitude: _savedLongitude ?? (widget.workerData['longitude'] as num?)?.toDouble(),
         isAvailable: true, // Always set to true
         level: _selectedLevel == 'professional' 
             ? WorkerLevel.professional 
@@ -257,86 +317,64 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 const SizedBox(height: 16),
                 _buildTextField('Phone Number', _phoneController, Iconsax.call, required: true, keyboardType: TextInputType.phone, hintText: 'e.g., +1 234 567 8900'),
                 const SizedBox(height: 16),
-                _buildTextField('Location', _locationController, Iconsax.location, required: true, hintText: 'e.g., New York, NY'),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _buildTextField('Location', _locationController, Iconsax.location, required: true, hintText: 'Tap Use GPS to set', enabled: false),
+                    ),
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: SizedBox(
+                        height: 52,
+                        child: OutlinedButton.icon(
+                          onPressed: _isGettingLocation ? null : _setLocationFromGps,
+                          icon: _isGettingLocation
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Iconsax.gps, size: 20),
+                          label: Text(_isGettingLocation ? '...' : 'Use GPS'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(color: AppColors.primary),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 24),
                 // Professional Information Section
                 _buildSectionTitle('Professional Information'),
                 const SizedBox(height: 12),
+                _buildTextField(
+                  'Years of Experience',
+                  _yearsOfExperienceController,
+                  Iconsax.calendar,
+                  keyboardType: TextInputType.number,
+                  hintText: 'e.g., 5',
+                ),
+                const SizedBox(height: 16),
                 _buildDropdownField(
-                  'Service Category *',
-                  _selectedCategory.isEmpty ? null : _selectedCategory,
-                  Iconsax.category,
-                  'Select your service category',
-                  WorkerCategories.categories
-                      .map((cat) => DropdownMenuItem(
-                            value: cat['name'] as String,
-                            child: Row(
-                              children: [
-                                Icon(cat['icon'] as IconData,
-                                    color: cat['color'] as Color, size: 20),
-                                const SizedBox(width: 12),
-                                Text(cat['name'] as String),
-                              ],
-                            ),
-                          ))
-                      .toList(),
+                  'Experience Level *',
+                  _selectedLevel,
+                  Iconsax.star,
+                  'Select your experience level',
+                  const [
+                    DropdownMenuItem(value: 'newbie', child: Text('🌱 Newbie')),
+                    DropdownMenuItem(value: 'professional', child: Text('⭐ Professional')),
+                    DropdownMenuItem(value: 'expert', child: Text('👑 Expert')),
+                  ],
                   (value) {
                     setState(() {
-                      _selectedCategory = value!;
+                      _selectedLevel = value!;
                     });
                   },
                   required: true,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  'Hourly Rate (\$) *',
-                  _hourlyRateController,
-                  Iconsax.dollar_circle,
-                  keyboardType: TextInputType.number,
-                  required: true,
-                  hintText: 'e.g., 25',
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  'Skills *',
-                  _skillsController,
-                  Iconsax.code,
-                  hintText: 'Separate with commas: Wiring, Installation, Troubleshooting',
-                  required: true,
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildTextField(
-                        'Years Exp.',
-                        _yearsOfExperienceController,
-                        Iconsax.calendar,
-                        keyboardType: TextInputType.number,
-                        hintText: '0',
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildDropdownField(
-                        'Experience Level',
-                        _selectedLevel,
-                        Iconsax.star,
-                        'Select level',
-                        const [
-                          DropdownMenuItem(value: 'newbie', child: Text('🌱 Newbie')),
-                          DropdownMenuItem(value: 'professional', child: Text('⭐ Professional')),
-                          DropdownMenuItem(value: 'expert', child: Text('👑 Expert')),
-                        ],
-                        (value) {
-                          setState(() {
-                            _selectedLevel = value!;
-                          });
-                        },
-                      ),
-                    ),
-                  ],
                 ),
                 const SizedBox(height: 24),
                 // About Section
@@ -587,7 +625,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              constraints: const BoxConstraints(minHeight: 52),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 color: AppColors.background,
                 borderRadius: BorderRadius.circular(12),
@@ -595,6 +634,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ? Border.all(color: AppColors.error, width: 1)
                     : null,
               ),
+              alignment: Alignment.centerLeft,
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: value,
@@ -614,6 +654,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     color: AppColors.textPrimary,
                     fontSize: 16,
                   ),
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),

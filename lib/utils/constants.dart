@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 
+/// Stripe publishable key (safe to ship in app).
+const String stripePublishableKey =
+    'pk_test_51OgPpFKLvENSzscJuOoZaDIalQQUJFUfO2uDVZHcHvgdRgaSZ3ELuxC2YfK91uUEKTOGfSq2QCHGEwfdHDanMZLF006tNsTVKx';
+
+/// Stripe secret key — used in-app to create PaymentIntents (no Vercel/website; flutter_stripe SDK only).
+/// For production, use a secure backend to create PaymentIntents and do not ship the secret in the app.
+const String stripeSecretKey =
+    'sk_test_51OgPpFKLvENSzscJ8EXwZ5R9ULP9MbcwSINwBMxVTloQ3AqzsAVMgFV8xSu8fXGg47t1EdnjnGFIW4wAliLuxp0D00YvUL67Fl';
+
 class AppColors {
   static const primary = Color(0xFF2563EB);
   static const secondary = Color(0xFF10B981);

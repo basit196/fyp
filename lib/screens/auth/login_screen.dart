@@ -51,30 +51,21 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         if (userCredential != null && mounted) {
-          // Get user role from Firestore (to ensure correct role)
-          String? userRole = await _authService.getUserRole(userCredential.user!.uid);
-          
-          // If user doesn't have a role yet, use the selected role
-          String finalRole = userRole ?? widget.userRole;
-          
-          // Update role in Firestore if it doesn't exist
-          if (userRole == null || userRole.isEmpty) {
-            await _authService.updateUserRole(userCredential.user!.uid, widget.userRole);
-            finalRole = widget.userRole;
-          }
+          // Persist the role they chose at login (User vs Worker) so restart shows correct side
+          await _authService.updateUserRole(userCredential.user!.uid, widget.userRole);
 
           // Save FCM token for notifications
           await _notificationService.saveTokenToFirestore(
             userCredential.user!.uid,
-            finalRole,
+            widget.userRole,
           );
 
           setState(() {
             _isLoading = false;
           });
 
-          // Navigate to appropriate dashboard based on role
-          if (finalRole == 'worker') {
+          // Navigate based on the role they chose at login
+          if (widget.userRole == 'worker') {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => const WorkerDashboard()),
@@ -118,6 +109,9 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (userCredential != null && mounted) {
+        // Persist the role they chose so app restart shows correct side (same as email login)
+        await _authService.updateUserRole(userCredential.user!.uid, widget.userRole);
+
         // Save FCM token for notifications
         await _notificationService.saveTokenToFirestore(
           userCredential.user!.uid,
@@ -128,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
           _isGoogleLoading = false;
         });
 
-        // Navigate to appropriate dashboard based on role
+        // Navigate based on the role they chose at login
         if (widget.userRole == 'worker') {
           Navigator.pushReplacement(
             context,

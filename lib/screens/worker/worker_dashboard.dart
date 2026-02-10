@@ -12,6 +12,7 @@ import 'worker_earnings_screen.dart';
 import 'create_gig_screen.dart';
 import 'my_gigs_screen.dart';
 import '../chat/chat_list_screen.dart';
+import '../../services/chat_service.dart';
 import '../notifications/notifications_screen.dart';
 
 class WorkerDashboard extends StatefulWidget {
@@ -185,16 +186,56 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: IconButton(
-              icon: const Icon(Iconsax.message, color: Colors.white),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ChatListScreen(),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: const Icon(Iconsax.message, color: Colors.white),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ChatListScreen(),
+                      ),
+                    );
+                  },
+                ),
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: StreamBuilder<int>(
+                    stream: ChatService().getTotalUnreadCountStream(
+                      currentUser.uid,
+                    ),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData || snapshot.data! == 0) {
+                        return const SizedBox.shrink();
+                      }
+                      return Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppColors.error,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Center(
+                          child: Text(
+                            snapshot.data! > 9 ? '9+' : '${snapshot.data}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+              ],
             ),
           ),
           Container(
@@ -219,9 +260,8 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
                 Positioned(
                   right: 8,
                   top: 8,
-                  child: FutureBuilder<int>(
-                    future: NotificationService()
-                        .getUnreadCount(currentUser.uid),
+                  child: StreamBuilder<int>(
+                    stream: NotificationService().getUnreadCountStream(currentUser.uid),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData || snapshot.data == 0) {
                         return const SizedBox.shrink();
@@ -294,7 +334,6 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
 
           final workerData = profileSnapshot.data!.data() as Map<String, dynamic>;
           final workerName = workerData['name'] ?? currentUser.displayName ?? 'Worker';
-          final workerCategory = workerData['category'] ?? 'Service Provider';
           final workerImage = workerData['profileImage'] ?? 
                              currentUser.photoURL ??
                              'https://ui-avatars.com/api/?name=${Uri.encodeComponent(workerName)}&background=2563EB&color=fff';
@@ -350,7 +389,7 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
                                   ),
                                 ),
                                 Text(
-                                  workerCategory,
+                                  'Service Provider',
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.9),
                                     fontSize: 14,

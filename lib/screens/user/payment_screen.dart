@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import '../../utils/constants.dart';
-import '../../services/job_service.dart';
+import '../../services/payment_service.dart';
 
 class PaymentScreen extends StatefulWidget {
   final String jobId;
@@ -13,54 +14,33 @@ class PaymentScreen extends StatefulWidget {
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
-  final JobService _jobService = JobService();
-  String _selectedPaymentMethod = 'card';
-  final _cardNumberController = TextEditingController();
-  final _expiryController = TextEditingController();
-  final _cvvController = TextEditingController();
-  final _nameController = TextEditingController();
+  final PaymentService _paymentService = PaymentService();
   bool _isProcessing = false;
 
-  @override
-  void dispose() {
-    _cardNumberController.dispose();
-    _expiryController.dispose();
-    _cvvController.dispose();
-    _nameController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _processPayment() async {
-    // Validate card details if card payment is selected
-    if (_selectedPaymentMethod == 'card') {
-      if (_nameController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please enter cardholder name'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-        return;
-      }
-      if (_cardNumberController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please enter card number'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-        return;
-      }
+  Future<void> _payWithStripe() async {
+    final totalCost = (widget.jobData['totalCost'] ?? 0).toDouble();
+    if (totalCost < 0.50) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Minimum payment is \$0.50'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
     }
 
     setState(() => _isProcessing = true);
 
     try {
-      await _jobService.markAsPaid(
-        widget.jobId,
-        widget.jobData['workerId'],
-        widget.jobData['userId'],
-        _selectedPaymentMethod,
+      await _paymentService.payWithStripe(
+        jobId: widget.jobId,
+        userId: widget.jobData['userId'] as String? ?? '',
+        workerId: widget.jobData['workerId'] as String? ?? '',
+        totalAmount: totalCost,
+        userName: widget.jobData['userName'] as String? ?? 'Customer',
+        workerName: widget.jobData['workerName'] as String? ?? 'Worker',
+        category: widget.jobData['category'] as String? ?? 'Service',
+        userEmail: null, // optional: pass from auth if needed
       );
 
       if (mounted) {
@@ -73,21 +53,32 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 Icon(Icons.check_circle,
                     color: AppColors.secondary, size: 32),
                 SizedBox(width: 12),
-                Text('Payment Successful!'),
+                Text('Payment Submitted'),
               ],
             ),
             content: const Text(
-              'Your payment has been processed successfully. The worker has been notified. Thank you for using SkillLink!',
+              'Your payment has been submitted successfully. It is pending admin approval. You will be notified once it is approved. Thank you for using SkillLink!',
             ),
             actions: [
               TextButton(
                 onPressed: () {
-                  Navigator.pop(context); // Close dialog
-                  Navigator.pop(context); // Go back to jobs screen
+                  Navigator.pop(context);
+                  Navigator.pop(context);
                 },
                 child: const Text('Done'),
               ),
             ],
+          ),
+        );
+      }
+    } on StripeException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e.error.localizedMessage ?? 'Payment failed',
+            ),
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -109,6 +100,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final totalCost = (widget.jobData['totalCost'] ?? 0).toDouble();
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -156,7 +149,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         CircleAvatar(
                           radius: 30,
                           backgroundImage: NetworkImage(
-                            widget.jobData['workerImage'] ?? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(widget.jobData['workerName'] ?? 'Worker')}&background=2563EB&color=fff',
+                            widget.jobData['workerImage'] ??
+                                'https://ui-avatars.com/api/?name=${Uri.encodeComponent(widget.jobData['workerName'] ?? 'Worker')}&background=2563EB&color=fff',
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -204,187 +198,36 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     const SizedBox(height: 12),
                     _SummaryRow(
                       'Total Amount',
-                      '\$${(widget.jobData['totalCost']?.toStringAsFixed(2) ?? '0.00')}',
+                      '\$${totalCost.toStringAsFixed(2)}',
                       isTotal: true,
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
-              // Payment Method
               const Text(
-                'Payment Method',
+                'Pay with Stripe',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 16),
-              _PaymentMethodTile(
-                icon: Icons.credit_card,
-                title: 'Credit/Debit Card',
-                value: 'card',
-                groupValue: _selectedPaymentMethod,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedPaymentMethod = value!;
-                  });
-                },
+              const SizedBox(height: 8),
+              Text(
+                'Pay securely with card, Apple Pay, or Google Pay. Payment will be recorded and pending admin approval.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
               ),
-              _PaymentMethodTile(
-                icon: Icons.account_balance_wallet,
-                title: 'Digital Wallet',
-                value: 'wallet',
-                groupValue: _selectedPaymentMethod,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedPaymentMethod = value!;
-                  });
-                },
-              ),
-              _PaymentMethodTile(
-                icon: Icons.account_balance,
-                title: 'Bank Transfer',
-                value: 'bank',
-                groupValue: _selectedPaymentMethod,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedPaymentMethod = value!;
-                  });
-                },
-              ),
-              if (_selectedPaymentMethod == 'card') ...[
-                const SizedBox(height: 24),
-                const Text(
-                  'Card Details',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _nameController,
-                  decoration: InputDecoration(
-                    labelText: 'Cardholder Name',
-                    prefixIcon: const Icon(Icons.person),
-                    filled: true,
-                    fillColor: AppColors.cardBackground,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.primary, width: 2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _cardNumberController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Card Number',
-                    prefixIcon: const Icon(Icons.credit_card),
-                    filled: true,
-                    fillColor: AppColors.cardBackground,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.primary, width: 2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _expiryController,
-                        keyboardType: TextInputType.datetime,
-                        decoration: InputDecoration(
-                          labelText: 'Expiry (MM/YY)',
-                          prefixIcon: const Icon(Icons.calendar_today),
-                          filled: true,
-                          fillColor: AppColors.cardBackground,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.border),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.border),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                                color: AppColors.primary, width: 2),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextField(
-                        controller: _cvvController,
-                        keyboardType: TextInputType.number,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'CVV',
-                          prefixIcon: const Icon(Icons.lock),
-                          filled: true,
-                          fillColor: AppColors.cardBackground,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.border),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.border),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                                color: AppColors.primary, width: 2),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
               const SizedBox(height: 24),
-              // Pay Button
               SizedBox(
                 width: double.infinity,
                 height: 50,
-                child: ElevatedButton(
-                  onPressed: _isProcessing ? null : _processPayment,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.secondary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    disabledBackgroundColor: AppColors.textSecondary,
-                  ),
-                  child: _isProcessing
+                child: ElevatedButton.icon(
+                  onPressed: _isProcessing ? null : _payWithStripe,
+                  icon: _isProcessing
                       ? const SizedBox(
                           height: 20,
                           width: 20,
@@ -393,10 +236,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
-                      : Text(
-                          'Pay \$${(widget.jobData['totalCost']?.toStringAsFixed(2) ?? '0.00')}',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
+                      : const Icon(Icons.payment, color: Colors.white),
+                  label: Text(
+                    _isProcessing ? 'Processing...' : 'Pay \$${totalCost.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    disabledBackgroundColor: AppColors.textSecondary,
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -444,58 +296,3 @@ class _SummaryRow extends StatelessWidget {
     );
   }
 }
-
-class _PaymentMethodTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-  final String groupValue;
-  final ValueChanged<String?> onChanged;
-
-  const _PaymentMethodTile({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.groupValue,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isSelected = value == groupValue;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isSelected ? AppColors.primary : AppColors.border,
-          width: isSelected ? 2 : 1,
-        ),
-      ),
-      child: RadioListTile<String>(
-        value: value,
-        groupValue: groupValue,
-        onChanged: onChanged,
-        title: Row(
-          children: [
-            Icon(icon, color: AppColors.primary),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
-        activeColor: AppColors.primary,
-      ),
-    );
-  }
-}
-
-
-

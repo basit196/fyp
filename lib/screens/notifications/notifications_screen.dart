@@ -74,25 +74,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           icon: const Icon(Iconsax.arrow_left, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await _notificationService.clearAllNotifications(_currentUserId);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('All notifications cleared'),
-                    backgroundColor: AppColors.secondary,
-                  ),
-                );
-              }
-            },
-            child: const Text(
-              'Clear All',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _currentUserId.isNotEmpty 
@@ -203,9 +184,63 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             return bTime.compareTo(aTime); // Descending order
           });
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: sortedDocs.length,
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          await _notificationService.markAllAsRead(_currentUserId);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('All marked as read'),
+                                backgroundColor: AppColors.secondary,
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Iconsax.tick_circle, size: 20),
+                        label: const Text('Mark all read'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          await _notificationService.clearAllNotifications(_currentUserId);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('All notifications cleared'),
+                                backgroundColor: AppColors.secondary,
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Iconsax.trash, size: 20),
+                        label: const Text('Clear All'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                          side: const BorderSide(color: AppColors.error),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  itemCount: sortedDocs.length,
             itemBuilder: (context, index) {
               var notificationData = sortedDocs[index].data() as Map<String, dynamic>;
               bool isRead = notificationData['read'] ?? false;
@@ -220,12 +255,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 isRead: isRead,
                 icon: _getNotificationIcon(type),
                 color: _getNotificationColor(type),
-                onTap: () {
-                  _notificationService.markAsRead(sortedDocs[index].id);
-                  // Handle navigation based on type
+                onTap: () async {
+                  if (!(notificationData['read'] == true)) {
+                    await _notificationService.markAsRead(sortedDocs[index].id);
+                  }
+                  // Handle navigation based on type if needed
                 },
               );
             },
+          ),
+              ),
+            ],
           );
         },
       ),

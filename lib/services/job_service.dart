@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'notification_service.dart';
+import 'firestore_service.dart';
 
 class JobService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final NotificationService _notificationService = NotificationService();
+  final FirestoreService _firestoreService = FirestoreService();
 
   /// Accept Job Request
   Future<void> acceptJob(String jobId, String workerId, String userId, String workerName) async {
@@ -79,6 +81,14 @@ class JobService {
 
       // Update worker stats
       await _updateWorkerStats(jobId);
+      // Update gig rating and total orders
+      DocumentSnapshot jobDoc = await _firestore.collection('jobs').doc(jobId).get();
+      if (jobDoc.exists) {
+        final gigId = jobDoc.get('gigId') as String?;
+        if (gigId != null && gigId.isNotEmpty) {
+          await _firestoreService.updateGigRatingAndOrders(gigId);
+        }
+      }
     } catch (e) {
       throw 'Error completing job: $e';
     }

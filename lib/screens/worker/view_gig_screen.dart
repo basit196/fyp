@@ -248,16 +248,16 @@ class ViewGigScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Hours Range',
+                            'Duration',
                             style: TextStyle(
                               fontSize: 12,
                               color: AppColors.textSecondary,
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            '${gigData['minHours']}-${gigData['maxHours']} hrs',
-                            style: const TextStyle(
+                          const Text(
+                            'Until complete',
+                            style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: AppColors.accent,
@@ -316,54 +316,6 @@ class ViewGigScreen extends StatelessWidget {
                         );
                       }).toList(),
                     ),
-                  ],
-                ),
-              ),
-
-            const SizedBox(height: 24),
-
-            // Requirements
-            if (gigData['requirements'] != null &&
-                (gigData['requirements'] as List).isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Requirements',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...(gigData['requirements'] as List).map<Widget>((req) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(
-                              Iconsax.tick_circle,
-                              color: AppColors.secondary,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                req.toString(),
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
                   ],
                 ),
               ),

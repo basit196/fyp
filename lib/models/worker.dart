@@ -10,13 +10,14 @@ class Worker {
   final String email;
   final String phone;
   final String profileImage;
-  final String category; // mechanic, electrician, plumber, carpenter, painter, etc.
-  final double hourlyRate;
+  final double? hourlyRate; // Optional; each gig has its own price
   final String description;
   final double rating;
   final int totalJobs;
   final List<String> skills;
   final String location;
+  final double? latitude;
+  final double? longitude;
   final bool isAvailable;
   final List<Review> reviews;
   final WorkerLevel level;
@@ -31,13 +32,14 @@ class Worker {
     required this.email,
     required this.phone,
     required this.profileImage,
-    required this.category,
-    required this.hourlyRate,
+    this.hourlyRate,
     required this.description,
     this.rating = 0.0,
     this.totalJobs = 0,
     required this.skills,
     required this.location,
+    this.latitude,
+    this.longitude,
     this.isAvailable = true,
     this.reviews = const [],
     this.level = WorkerLevel.newbie,

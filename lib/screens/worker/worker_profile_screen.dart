@@ -140,9 +140,9 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                               color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: Text(
-                              workerData['category'] ?? 'Service Provider',
-                              style: const TextStyle(
+                            child: const Text(
+                              'Service Provider',
+                              style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
                               ),
@@ -244,11 +244,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                       title: 'Service Details',
                       children: [
                         _InfoTile(
-                          icon: Icons.attach_money,
-                          label: 'Hourly Rate',
-                          value: '\$${(workerData['hourlyRate'] ?? 0).toStringAsFixed(0)}/hour',
-                        ),
-                        _InfoTile(
                           icon: Icons.work,
                           label: 'Total Jobs Completed',
                           value: '${earnings['totalJobs']}',
@@ -268,32 +263,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                           ),
                       ],
                     ),
-                    // Skills
-                    if (workerData['skills'] != null && (workerData['skills'] as List).isNotEmpty)
-                      _InfoSection(
-                        title: 'Skills',
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: (workerData['skills'] as List)
-                                  .map(
-                                    (skill) => Chip(
-                                      label: Text(skill.toString()),
-                                      backgroundColor: AppColors.primary.withOpacity(0.1),
-                                      labelStyle: const TextStyle(
-                                        color: AppColors.primary,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                          ),
-                        ],
-                      ),
                     // About
                     if (workerData['description'] != null && workerData['description'].toString().isNotEmpty)
                       _InfoSection(
@@ -370,26 +339,17 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   }
 
   bool _isProfileIncomplete(Map<String, dynamic> workerData) {
-    // Check for required fields
+    // Check for required fields (category, skills, hourly rate are on gigs, not worker profile)
     String? phone = workerData['phone'];
     String? location = workerData['location'];
-    String? category = workerData['category'];
-    double? hourlyRate = workerData['hourlyRate'];
     String? description = workerData['description'];
-    List? skills = workerData['skills'];
 
     return phone == null || 
            phone.isEmpty || 
            location == null || 
            location.isEmpty ||
-           category == null || 
-           category.isEmpty ||
-           hourlyRate == null ||
-           hourlyRate == 0 ||
            description == null ||
-           description.isEmpty ||
-           skills == null ||
-           skills.isEmpty;
+           description.isEmpty;
   }
 
   Widget _buildIncompleteProfile(BuildContext context, User currentUser, Map<String, dynamic> workerData) {
@@ -551,17 +511,8 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     if (workerData['location'] == null || workerData['location'].toString().isEmpty) {
       missing.add('Location');
     }
-    if (workerData['category'] == null || workerData['category'].toString().isEmpty) {
-      missing.add('Service Category');
-    }
-    if (workerData['hourlyRate'] == null || workerData['hourlyRate'] == 0) {
-      missing.add('Hourly Rate');
-    }
     if (workerData['description'] == null || workerData['description'].toString().isEmpty) {
       missing.add('Description');
-    }
-    if (workerData['skills'] == null || (workerData['skills'] as List).isEmpty) {
-      missing.add('Skills');
     }
     return missing;
   }

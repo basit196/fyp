@@ -5,10 +5,16 @@ import '../../utils/constants.dart';
 import '../../services/auth_service.dart';
 import '../../services/job_service.dart';
 import '../welcome_screen.dart';
+import 'user_edit_profile_screen.dart';
 
-class UserProfileScreen extends StatelessWidget {
+class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
 
+  @override
+  State<UserProfileScreen> createState() => _UserProfileScreenState();
+}
+
+class _UserProfileScreenState extends State<UserProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
@@ -215,16 +221,14 @@ class UserProfileScreen extends StatelessWidget {
                       _ActionButton(
                         icon: Iconsax.edit,
                         label: 'Edit Profile',
-                        onTap: () {
-                          // Navigate to edit profile
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _ActionButton(
-                        icon: Iconsax.setting_2,
-                        label: 'Settings',
-                        onTap: () {
-                          // Navigate to settings
+                        onTap: () async {
+                          final updated = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const UserEditProfileScreen(),
+                            ),
+                          );
+                          if (updated == true && mounted) setState(() {});
                         },
                       ),
                       const SizedBox(height: 12),
@@ -232,11 +236,22 @@ class UserProfileScreen extends StatelessWidget {
                         icon: Iconsax.info_circle,
                         label: 'About SkillLink',
                         onTap: () {
-                          showAboutDialog(
+                          showDialog(
                             context: context,
-                            applicationName: 'SkillLink',
-                            applicationVersion: '1.0.0',
-                            applicationLegalese: '© 2025 SkillLink Team\nMuhammad Ali, Muhammad Alyan, Affan Naveed',
+                            builder: (context) => AlertDialog(
+                              title: const Text('About SkillLink'),
+                              content: const SingleChildScrollView(
+                                child: Text(
+                                  'Version 1.0.0\n\n© 2025 SkillLink Team\nMuhammad Ali, Muhammad Alyan, Affan Naveed',
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('OK'),
+                                ),
+                              ],
+                            ),
                           );
                         },
                       ),

@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../utils/constants.dart';
 import '../../services/auth_service.dart';
 import '../../services/notification_service.dart';
+import 'login_screen.dart';
 import '../worker/worker_dashboard.dart';
 import '../user/browse_gigs_screen.dart';
 
@@ -68,38 +69,31 @@ class _SignupScreenState extends State<SignupScreen> {
         );
 
         if (userCredential != null && mounted) {
-          // Initialize notifications
-          await _notificationService.initialize();
-          await _notificationService.saveTokenToFirestore(
-            userCredential.user!.uid,
-            widget.userRole,
-          );
-
           setState(() {
             _isLoading = false;
           });
 
+          // Sign out so they must log in (do not go to main screens after signup)
+          await _authService.signOut();
+
+          if (!mounted) return;
+
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Account created successfully! 🎉'),
+              content: Text('Account created successfully! Please log in.'),
               backgroundColor: AppColors.secondary,
               behavior: SnackBarBehavior.floating,
             ),
           );
 
-          // Navigate to appropriate dashboard based on role
-          if (widget.userRole == 'worker') {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const WorkerDashboard()),
-            );
-          } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const BrowseGigsScreen()),
-            );
-          }
+          // Navigate to login so they can sign in with their new account
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LoginScreen(userRole: widget.userRole),
+            ),
+          );
         }
       } catch (e) {
         setState(() {

@@ -156,11 +156,23 @@ class MyGigsScreen extends StatelessWidget {
             );
           }
 
+          // Sort by createdAt descending so latest gigs appear on top
+          final docs = snapshot.data!.docs;
+          final sortedDocs = List<DocumentSnapshot>.from(docs)
+            ..sort((a, b) {
+              final aTime = a.get('createdAt') as Timestamp?;
+              final bTime = b.get('createdAt') as Timestamp?;
+              if (aTime == null && bTime == null) return 0;
+              if (aTime == null) return 1;
+              if (bTime == null) return -1;
+              return bTime.compareTo(aTime);
+            });
+
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: snapshot.data!.docs.length,
+            itemCount: sortedDocs.length,
             itemBuilder: (context, index) {
-              var doc = snapshot.data!.docs[index];
+              var doc = sortedDocs[index];
               var gigData = doc.data() as Map<String, dynamic>;
               String gigId = doc.id;
               
@@ -267,7 +279,7 @@ class MyGigsScreen extends StatelessWidget {
                               size: 16, color: AppColors.textSecondary),
                           const SizedBox(width: 4),
                           Text(
-                            '${gigData['minHours']}-${gigData['maxHours']} hrs',
+                            'Until complete',
                             style: const TextStyle(
                               fontSize: 14,
                               color: AppColors.textSecondary,

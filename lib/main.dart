@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'screens/worker/worker_dashboard.dart';
@@ -24,6 +25,11 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Stripe (publishable key only; secret key stays on server)
+  Stripe.publishableKey = stripePublishableKey;
+  Stripe.urlScheme = 'skilllink';
+  await Stripe.instance.applySettings();
   
   // Initialize Notifications
   final notificationService = NotificationService();
@@ -81,8 +87,9 @@ class AuthWrapper extends StatelessWidget {
                 );
               }
 
-              // Navigate based on role
-              if (roleSnapshot.data == 'worker') {
+              // Navigate based on role from Firestore (default to user to avoid worker "profile not found")
+              final role = roleSnapshot.data;
+              if (role == 'worker') {
                 return const WorkerDashboard();
               } else {
                 return const BrowseGigsScreen();

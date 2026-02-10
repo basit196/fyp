@@ -49,7 +49,7 @@ class _HireWorkerScreenState extends State<HireWorkerScreen> {
     }
   }
 
-  double get estimatedCost => _estimatedHours * widget.worker.hourlyRate;
+  double get estimatedCost => _estimatedHours * (widget.worker.hourlyRate ?? 0);
 
   @override
   Widget build(BuildContext context) {
@@ -105,9 +105,9 @@ class _HireWorkerScreenState extends State<HireWorkerScreen> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text(
-                              widget.worker.category,
-                              style: const TextStyle(
+                            const Text(
+                              'Service Provider',
+                              style: TextStyle(
                                 fontSize: 14,
                                 color: AppColors.textSecondary,
                               ),
@@ -119,16 +119,20 @@ class _HireWorkerScreenState extends State<HireWorkerScreen> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            '\$${widget.worker.hourlyRate.toInt()}',
+                            (widget.worker.hourlyRate != null && widget.worker.hourlyRate! > 0)
+                                ? '\$${widget.worker.hourlyRate!.toInt()}'
+                                : 'See gigs',
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: AppColors.primary,
                             ),
                           ),
-                          const Text(
-                            'per hour',
-                            style: TextStyle(
+                          Text(
+                            (widget.worker.hourlyRate != null && widget.worker.hourlyRate! > 0)
+                                ? 'per hour'
+                                : 'for pricing',
+                            style: const TextStyle(
                               fontSize: 12,
                               color: AppColors.textSecondary,
                             ),
@@ -335,7 +339,9 @@ class _HireWorkerScreenState extends State<HireWorkerScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '\$${estimatedCost.toStringAsFixed(2)}',
+                        (widget.worker.hourlyRate != null && widget.worker.hourlyRate! > 0)
+                            ? '\$${estimatedCost.toStringAsFixed(2)}'
+                            : '—',
                         style: const TextStyle(
                           fontSize: 36,
                           fontWeight: FontWeight.bold,
@@ -344,7 +350,9 @@ class _HireWorkerScreenState extends State<HireWorkerScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '${_estimatedHours.toStringAsFixed(1)} hours × \$${widget.worker.hourlyRate}/hr',
+                        (widget.worker.hourlyRate != null && widget.worker.hourlyRate! > 0)
+                            ? '${_estimatedHours.toStringAsFixed(1)} hours × \$${widget.worker.hourlyRate}/hr'
+                            : 'Rates vary by gig — browse their gigs for pricing',
                         style: const TextStyle(
                           fontSize: 14,
                           color: AppColors.textSecondary,

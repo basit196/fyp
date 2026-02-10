@@ -104,26 +104,20 @@ class AuthService {
           'email': userCredential.user!.email ?? '',
           'phone': userCredential.user!.phoneNumber ?? '',
           'photoURL': userCredential.user!.photoURL ?? '',
-          'role': role, // Save the selected role
+          'role': role,
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
       } else {
-        // Existing user - update role if it doesn't match (optional)
-        // Or you can keep the existing role
-        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-        String? existingRole = userData['role'] as String?;
-        
-        // If user doesn't have a role, update it
-        if (existingRole == null || existingRole.isEmpty) {
-          await _firestore
-              .collection('users')
-              .doc(userCredential.user!.uid)
-              .update({
-            'role': role,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
+        // Existing user - always update role to what they chose at login (User vs Worker)
+        // so restart shows the correct side
+        await _firestore
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .update({
+          'role': role,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
       }
 
       return userCredential;
@@ -181,6 +175,27 @@ class AuthService {
       return null;
     } catch (e) {
       return null;
+    }
+  }
+
+  // Update user profile (name, phone) for client users
+  Future<void> updateUserProfile({
+    required String uid,
+    required String name,
+    String? phone,
+  }) async {
+    try {
+      User? user = _auth.currentUser;
+      if (user != null && user.uid == uid) {
+        await user.updateDisplayName(name);
+      }
+      await _firestore.collection('users').doc(uid).update({
+        'name': name,
+        if (phone != null) 'phone': phone,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      rethrow;
     }
   }
 

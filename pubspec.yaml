@@ -63,6 +63,13 @@ dependencies:
   # HTTP for API calls
   http: ^1.1.0
 
+  # Location (GPS + city name)
+  geolocator: ^13.0.2
+  geocoding: ^3.0.0
+
+  # Stripe payments
+  flutter_stripe: ^12.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

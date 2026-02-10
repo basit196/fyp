@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../models/gig.dart';
 import '../../utils/constants.dart';
+import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/chat_service.dart';
 import '../../widgets/level_badge.dart';
 import '../../models/worker.dart';
 import 'gig_detail_screen.dart';
@@ -24,6 +27,10 @@ class BrowseGigsScreen extends StatefulWidget {
 
 class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
   String _selectedCategory = 'All';
+  /// 'All' = all locations (default), 'NearMe' = within 30 km (requires GPS)
+  String _locationFilterMode = 'All';
+  double? _userLatitude;
+  double? _userLongitude;
   final TextEditingController _searchController = TextEditingController();
   final FirestoreService _firestoreService = FirestoreService();
   
@@ -72,6 +79,160 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
     }).toList();
   }
 
+  static const double _nearMeRadiusKm = 30.0;
+
+  List<DocumentSnapshot> _filterByLocation(List<DocumentSnapshot> docs) {
+    if (_locationFilterMode != 'NearMe' || _userLatitude == null || _userLongitude == null) {
+      return docs;
+    }
+    return docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final gigLat = (data['latitude'] as num?)?.toDouble();
+      final gigLng = (data['longitude'] as num?)?.toDouble();
+      if (gigLat == null || gigLng == null) return false;
+      final distanceMeters = Geolocator.distanceBetween(
+        _userLatitude!,
+        _userLongitude!,
+        gigLat,
+        gigLng,
+      );
+      final distanceKm = distanceMeters / 1000.0;
+      return distanceKm <= _nearMeRadiusKm;
+    }).toList();
+  }
+
+  Future<void> _showFilterSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Filter by location',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'By default all locations are shown. Turn on GPS and select "Near me" to find workers within 30 km.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    _locationFilterMode == 'All' ? Iconsax.tick_circle5 : Iconsax.location,
+                    color: _locationFilterMode == 'All' ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                  title: const Text('All locations'),
+                  subtitle: const Text('Show services from everywhere'),
+                  onTap: () {
+                    setState(() {
+                      _locationFilterMode = 'All';
+                      _userLatitude = null;
+                      _userLongitude = null;
+                    });
+                    Navigator.pop(context);
+                  },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    _locationFilterMode == 'NearMe' ? Iconsax.tick_circle5 : Iconsax.gps,
+                    color: _locationFilterMode == 'NearMe' ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                  title: const Text('Near me (within 30 km)'),
+                  subtitle: const Text('Turn on GPS to find workers nearby'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final position = await _getUserLocationForFilter();
+                    if (position != null && mounted) {
+                      setState(() {
+                        _locationFilterMode = 'NearMe';
+                        _userLatitude = position.latitude;
+                        _userLongitude = position.longitude;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<Position?> _getUserLocationForFilter() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please enable location services (GPS) to use "Near me".'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return null;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location permission is required for "Near me" filter.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return null;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Showing workers within 30 km'),
+            backgroundColor: AppColors.secondary,
+          ),
+        );
+      }
+      return position;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not get location: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return null;
+    }
+  }
+
   Gig _documentToGig(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     Timestamp? createdAtTimestamp = data['createdAt'] as Timestamp?;
@@ -104,12 +265,22 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 0,
-        title: const Text(
-          'Browse Services',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
+        title: FutureBuilder<Map<String, dynamic>?>(
+          future: FirebaseAuth.instance.currentUser != null
+              ? AuthService().getUserData(FirebaseAuth.instance.currentUser!.uid)
+              : Future.value(null),
+          builder: (context, snapshot) {
+            final name = snapshot.data?['name'] as String? ??
+                FirebaseAuth.instance.currentUser?.displayName ??
+                'User';
+            return Text(
+              name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            );
+          },
         ),
         leading: IconButton(
           icon: const Icon(Iconsax.user, color: Colors.white),
@@ -129,16 +300,56 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: IconButton(
-              icon: const Icon(Iconsax.message, color: Colors.white),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ChatListScreen(),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: const Icon(Iconsax.message, color: Colors.white),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ChatListScreen(),
+                      ),
+                    );
+                  },
+                ),
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: StreamBuilder<int>(
+                    stream: ChatService().getTotalUnreadCountStream(
+                      FirebaseAuth.instance.currentUser?.uid ?? '',
+                    ),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData || snapshot.data! == 0) {
+                        return const SizedBox.shrink();
+                      }
+                      return Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppColors.error,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Center(
+                          child: Text(
+                            snapshot.data! > 9 ? '9+' : '${snapshot.data}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+              ],
             ),
           ),
           Container(
@@ -181,9 +392,10 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
                 Positioned(
                   right: 8,
                   top: 8,
-                  child: FutureBuilder<int>(
-                    future: NotificationService()
-                        .getUnreadCount(FirebaseAuth.instance.currentUser?.uid ?? ''),
+                  child: StreamBuilder<int>(
+                    stream: NotificationService().getUnreadCountStream(
+                      FirebaseAuth.instance.currentUser?.uid ?? '',
+                    ),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData || snapshot.data == 0) {
                         return const SizedBox.shrink();
@@ -262,7 +474,7 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(
-                          Iconsax.magic_star,
+                          Iconsax.magicpen,
                           color: AppColors.accent,
                           size: 24,
                         ),
@@ -305,6 +517,22 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Text(
+                  'Browse Services',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           // Categories
           SizedBox(
             height: 50,
@@ -342,7 +570,6 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
           // Gigs List (Real-time from Firebase)
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
@@ -429,6 +656,8 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
                 
                 // Filter by search query
                 List<DocumentSnapshot> filteredDocs = _filterBySearch(categoryFiltered);
+                // Filter by location: All or Near me (30 km radius, requires GPS)
+                filteredDocs = _filterByLocation(filteredDocs);
                 
                 // Sort by createdAt (newest first) - client-side sorting
                 filteredDocs.sort((a, b) {
@@ -472,8 +701,9 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
                 }
 
                 return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Results Count
+                    // Results Count + Filter (location: All / Near me 30 km)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
@@ -488,9 +718,19 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
                             ),
                           ),
                           TextButton.icon(
-                            onPressed: () {},
-                            icon: const Icon(Iconsax.filter, size: 18),
-                            label: const Text('Filter'),
+                            onPressed: _showFilterSheet,
+                            icon: Icon(
+                              Iconsax.filter,
+                              size: 18,
+                              color: _locationFilterMode == 'NearMe' ? AppColors.primary : null,
+                            ),
+                            label: Text(
+                              _locationFilterMode == 'NearMe' ? 'Near me (30 km)' : 'Filter',
+                              style: TextStyle(
+                                fontWeight: _locationFilterMode == 'NearMe' ? FontWeight.w600 : null,
+                                color: _locationFilterMode == 'NearMe' ? AppColors.primary : null,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -652,6 +892,18 @@ class _GigCard extends StatelessWidget {
                                 level: _parseLevel(gigData['level']),
                                 size: 10,
                               ),
+                            if (gig.location.isNotEmpty && gig.location != 'Not specified') ...[
+                              const SizedBox(width: 8),
+                              Icon(Iconsax.location, size: 12, color: AppColors.textSecondary),
+                              const SizedBox(width: 4),
+                              Text(
+                                gig.location,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ],
@@ -743,7 +995,7 @@ class _GigCard extends StatelessWidget {
                     ],
                   ),
                   Text(
-                    '${gig.minHours}-${gig.maxHours} hours',
+                    'Until complete',
                     style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,

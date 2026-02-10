@@ -755,7 +755,7 @@ class _GigCard extends StatelessWidget {
                     ],
                   ),
                   Text(
-                    '${gig.minHours}-${gig.maxHours} hours',
+                    'Until complete',
                     style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,

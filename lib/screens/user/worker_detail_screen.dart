@@ -68,9 +68,9 @@ class WorkerDetailScreen extends StatelessWidget {
                             color: Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: Text(
-                            worker.category,
-                            style: const TextStyle(
+                          child: const Text(
+                            'Service Provider',
+                            style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
                             ),
@@ -116,7 +116,9 @@ class WorkerDetailScreen extends StatelessWidget {
                         child: _StatCard(
                           icon: Icons.attach_money,
                           label: 'Rate/hr',
-                          value: '\$${worker.hourlyRate.toInt()}',
+                          value: (worker.hourlyRate != null && worker.hourlyRate! > 0)
+                              ? '\$${worker.hourlyRate!.toInt()}'
+                              : 'See gigs',
                           color: AppColors.secondary,
                         ),
                       ),
@@ -143,33 +145,35 @@ class WorkerDetailScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                // Skills Section
-                _SectionTitle('Skills'),
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBackground,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: worker.skills
-                        .map(
-                          (skill) => Chip(
-                            label: Text(skill),
-                            backgroundColor: AppColors.primary.withOpacity(0.1),
-                            labelStyle: const TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w500,
+                // Skills (only on gigs; hide if empty)
+                if (worker.skills.isNotEmpty) ...[
+                  _SectionTitle('Skills'),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBackground,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: worker.skills
+                          .map(
+                            (skill) => Chip(
+                              label: Text(skill),
+                              backgroundColor: AppColors.primary.withOpacity(0.1),
+                              labelStyle: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                        )
-                        .toList(),
+                          )
+                          .toList(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
+                ],
                 // Contact Info
                 _SectionTitle('Contact Information'),
                 Container(

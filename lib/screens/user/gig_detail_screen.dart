@@ -22,7 +22,7 @@ class GigDetailScreen extends StatelessWidget {
             pinned: true,
             backgroundColor: AppColors.primary,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              icon: const Icon(Iconsax.arrow_left, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
             flexibleSpace: FlexibleSpaceBar(
@@ -83,6 +83,45 @@ class GigDetailScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 16),
+                // Gig title (main heading)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    gig.title,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Category & Location
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _InfoCard(
+                          icon: Iconsax.category,
+                          label: 'Category',
+                          value: gig.category.isNotEmpty ? gig.category : '—',
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _InfoCard(
+                          icon: Iconsax.location,
+                          label: 'Service area',
+                          value: (gig.location.isEmpty || gig.location == 'Not specified')
+                              ? '—'
+                              : gig.location,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
                 // Price Card
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -109,7 +148,7 @@ class GigDetailScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Hourly Rate',
+                            'Hourly rate',
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 14,
@@ -120,7 +159,7 @@ class GigDetailScreen extends StatelessWidget {
                             '\$${gig.hourlyRate.toStringAsFixed(0)}/hr',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 32,
+                              fontSize: 28,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -128,19 +167,19 @@ class GigDetailScreen extends StatelessWidget {
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
+                          horizontal: 14,
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text(
-                          '${gig.minHours}-${gig.maxHours}hrs',
-                          style: const TextStyle(
+                        child: const Text(
+                          'Until complete',
+                          style: TextStyle(
                             color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -148,44 +187,8 @@ class GigDetailScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                // Category & Location
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _InfoCard(
-                          icon: Iconsax.category,
-                          label: 'Category',
-                          value: gig.category,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _InfoCard(
-                          icon: Iconsax.location,
-                          label: 'Location',
-                          value: gig.location,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Title
-                _SectionTitle('About this Service'),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    gig.title,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
                 // Description
+                _SectionTitle('Description'),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
@@ -197,59 +200,28 @@ class GigDetailScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                // Skills
-                _SectionTitle('Skills Offered'),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: gig.skills
-                        .map((skill) => Chip(
-                              label: Text(skill),
-                              backgroundColor:
-                                  AppColors.secondary.withOpacity(0.1),
-                              labelStyle: const TextStyle(
-                                color: AppColors.secondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              avatar: const Icon(
-                                Iconsax.tick_circle,
-                                size: 18,
-                                color: AppColors.secondary,
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                ),
-                // Requirements
-                if (gig.requirements.isNotEmpty) ...[
-                  _SectionTitle('Requirements'),
+                // Skills (only when present)
+                if (gig.skills.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  _SectionTitle('Skills offered'),
                   Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: gig.requirements
-                          .map((req) => Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Iconsax.verify5,
-                                      size: 20,
-                                      color: AppColors.primary,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        req,
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: gig.skills
+                          .map((skill) => Chip(
+                                label: Text(skill),
+                                backgroundColor:
+                                    AppColors.secondary.withOpacity(0.1),
+                                labelStyle: const TextStyle(
+                                  color: AppColors.secondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                avatar: const Icon(
+                                  Iconsax.tick_circle,
+                                  size: 18,
+                                  color: AppColors.secondary,
                                 ),
                               ))
                           .toList(),

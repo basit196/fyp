@@ -14,7 +14,6 @@ class UserHomeScreen extends StatefulWidget {
 }
 
 class _UserHomeScreenState extends State<UserHomeScreen> {
-  String? _selectedCategory;
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -23,14 +22,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     super.dispose();
   }
 
-  List<Worker> get filteredWorkers {
-    if (_selectedCategory == null) {
-      return SampleData.workers;
-    }
-    return SampleData.workers
-        .where((w) => w.category == _selectedCategory)
-        .toList();
-  }
+  // Category is only on gigs; workers are shown without category filter
+  List<Worker> get filteredWorkers => SampleData.workers;
 
   @override
   Widget build(BuildContext context) {
@@ -154,88 +147,14 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          // Categories
-          SizedBox(
-            height: 120,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: WorkerCategories.categories.length,
-              itemBuilder: (context, index) {
-                final category = WorkerCategories.categories[index];
-                final isSelected =
-                    _selectedCategory == category['name'] as String;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      if (isSelected) {
-                        _selectedCategory = null;
-                      } else {
-                        _selectedCategory = category['name'] as String;
-                      }
-                    });
-                  },
-                  child: Container(
-                    width: 90,
-                    margin: const EdgeInsets.only(right: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? category['color'] as Color
-                          : AppColors.cardBackground,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: isSelected
-                            ? category['color'] as Color
-                            : AppColors.border,
-                        width: 2,
-                      ),
-                      boxShadow: [
-                        if (isSelected)
-                          BoxShadow(
-                            color: (category['color'] as Color).withOpacity(0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          category['icon'] as IconData,
-                          size: 36,
-                          color: isSelected
-                              ? Colors.white
-                              : category['color'] as Color,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          category['name'] as String,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isSelected
-                                ? Colors.white
-                                : AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Workers List
+          // Workers List (category filter is on Browse Gigs, not workers)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  _selectedCategory ?? 'All Workers',
+                const Text(
+                  'All Workers',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -343,9 +262,9 @@ class _WorkerCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    worker.category,
-                    style: const TextStyle(
+                  const Text(
+                    'Service Provider',
+                    style: TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
                     ),
@@ -404,16 +323,18 @@ class _WorkerCard extends StatelessWidget {
             Column(
               children: [
                 Text(
-                  '\$${worker.hourlyRate.toInt()}',
+                  (worker.hourlyRate != null && worker.hourlyRate! > 0)
+                      ? '\$${worker.hourlyRate!.toInt()}'
+                      : 'See gigs',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: AppColors.primary,
                   ),
                 ),
-                const Text(
-                  'per hour',
-                  style: TextStyle(
+                Text(
+                  (worker.hourlyRate != null && worker.hourlyRate! > 0) ? 'per hour' : 'for pricing',
+                  style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),

@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/worker.dart';
 
@@ -14,13 +16,13 @@ class FirestoreService {
       'email': worker.email,
       'phone': worker.phone,
       'profileImage': worker.profileImage,
-      'category': worker.category,
-      'hourlyRate': worker.hourlyRate,
       'description': worker.description,
       'rating': worker.rating,
       'totalJobs': worker.totalJobs,
       'skills': worker.skills,
       'location': worker.location,
+      'latitude': worker.latitude,
+      'longitude': worker.longitude,
       'isAvailable': worker.isAvailable,
       'level': worker.level.toString().split('.').last,
       'yearsOfExperience': worker.yearsOfExperience,
@@ -183,44 +185,124 @@ class FirestoreService {
   /// Add Review
   Future<void> addReview({
     required String jobId,
+    required String gigId,
     required String workerId,
     required String userId,
     required String userName,
     required double rating,
     required String comment,
   }) async {
-    await _firestore.collection('reviews').add({
-      'jobId': jobId,
-      'workerId': workerId,
-      'userId': userId,
-      'userName': userName,
-      'rating': rating,
-      'comment': comment,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _firestore.collection('reviews').add({
+        'jobId': jobId,
+        'gigId': gigId,
+        'workerId': workerId,
+        'userId': userId,
+        'userName': userName,
+        'rating': rating,
+        'comment': comment,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e, st) {
+      developer.log('addReview: failed to add review document', error: e, stackTrace: st, name: 'FirestoreService');
+      rethrow;
+    }
 
-    // Update worker's average rating
-    await _updateWorkerRating(workerId);
+    try {
+      await _updateWorkerRating(workerId);
+    } catch (e, st) {
+      developer.log('addReview: failed to update worker rating', error: e, stackTrace: st, name: 'FirestoreService');
+      rethrow;
+    }
+
+    try {
+      await _updateGigRatingAndOrders(gigId);
+    } catch (e, st) {
+      developer.log('addReview: failed to update gig rating/orders', error: e, stackTrace: st, name: 'FirestoreService');
+      rethrow;
+    }
   }
 
   /// Update Worker's Average Rating
   Future<void> _updateWorkerRating(String workerId) async {
-    QuerySnapshot reviews = await _firestore
-        .collection('reviews')
-        .where('workerId', isEqualTo: workerId)
-        .get();
+    try {
+      QuerySnapshot reviews = await _firestore
+          .collection('reviews')
+          .where('workerId', isEqualTo: workerId)
+          .get();
 
-    if (reviews.docs.isNotEmpty) {
-      double totalRating = 0;
-      for (var doc in reviews.docs) {
-        totalRating += doc.get('rating') as double;
+      if (reviews.docs.isNotEmpty) {
+        double totalRating = 0;
+        for (var doc in reviews.docs) {
+          totalRating += (doc.get('rating') as num?)?.toDouble() ?? 0;
+        }
+        double avgRating = totalRating / reviews.docs.length;
+
+        await _firestore.collection('workers').doc(workerId).update({
+          'rating': avgRating,
+          'totalJobs': reviews.docs.length,
+        });
       }
-      double avgRating = totalRating / reviews.docs.length;
+    } catch (e, st) {
+      developer.log('_updateWorkerRating: workerId=$workerId', error: e, stackTrace: st, name: 'FirestoreService');
+      rethrow;
+    }
+  }
 
-      await _firestore.collection('workers').doc(workerId).update({
+  /// Update gig's rating and totalOrders (call after review or job completion).
+  Future<void> updateGigRatingAndOrders(String gigId) async {
+    if (gigId.isEmpty) return;
+    await _updateGigRatingAndOrdersImpl(gigId);
+  }
+
+  Future<void> _updateGigRatingAndOrders(String gigId) async {
+    if (gigId.isEmpty) return;
+    await _updateGigRatingAndOrdersImpl(gigId);
+  }
+
+  Future<void> _updateGigRatingAndOrdersImpl(String gigId) async {
+    try {
+      // Rating: average of all reviews for this gig
+      QuerySnapshot reviewSnap = await _firestore
+          .collection('reviews')
+          .where('gigId', isEqualTo: gigId)
+          .get();
+
+      double avgRating = 0.0;
+      if (reviewSnap.docs.isNotEmpty) {
+        double total = 0;
+        for (var doc in reviewSnap.docs) {
+          total += (doc.get('rating') as num?)?.toDouble() ?? 0;
+        }
+        avgRating = total / reviewSnap.docs.length;
+      }
+
+      // Total orders: count of jobs for this gig that are completed or paid
+      QuerySnapshot jobsSnap = await _firestore
+          .collection('jobs')
+          .where('gigId', isEqualTo: gigId)
+          .get();
+
+      int totalOrders = 0;
+      for (var doc in jobsSnap.docs) {
+        final raw = doc.data();
+        if (raw == null) continue;
+        final data = raw as Map<String, dynamic>;
+        final status = data['status'] as String?;
+        final paymentSubmitted = data['paymentSubmitted'] as bool?;
+        if (status == 'completed' || status == 'paid' || paymentSubmitted == true) {
+          totalOrders++;
+        }
+      }
+
+      await _firestore.collection('gigs').doc(gigId).update({
         'rating': avgRating,
-        'totalJobs': reviews.docs.length,
+        'totalOrders': totalOrders,
+        'updatedAt': FieldValue.serverTimestamp(),
       });
+    } catch (e, st) {
+      developer.log('_updateGigRatingAndOrdersImpl: gigId=$gigId', error: e, stackTrace: st, name: 'FirestoreService');
+      rethrow;
     }
   }
 
@@ -233,6 +315,31 @@ class FirestoreService {
         .where('workerId', isEqualTo: workerId)
         .limit(50)
         .snapshots();
+  }
+
+  // ========== PAYMENTS (Stripe – status: pending → admin approves/denies) ==========
+
+  /// Get all payments (for admin: filter by status 'pending', then approve/deny)
+  Stream<QuerySnapshot> getPayments({String? status}) {
+    if (status != null) {
+      return _firestore
+          .collection('payments')
+          .where('status', isEqualTo: status)
+          .orderBy('createdAt', descending: true)
+          .snapshots();
+    }
+    return _firestore
+        .collection('payments')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  /// Update payment status (admin: 'approved' or 'denied')
+  Future<void> updatePaymentStatus(String paymentId, String status) async {
+    await _firestore.collection('payments').doc(paymentId).update({
+      'status': status,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 }
 

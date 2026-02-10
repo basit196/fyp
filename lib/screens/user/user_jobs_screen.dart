@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -271,6 +273,7 @@ class _UserJobCardState extends State<_UserJobCard> {
       context: context,
       builder: (context) => _ReviewDialog(
         jobId: widget.jobDoc.id,
+        gigId: jobData['gigId'] ?? '',
         workerId: jobData['workerId'] ?? '',
         workerName: jobData['workerName'] ?? 'the worker',
         userId: currentUser.uid,
@@ -323,6 +326,11 @@ class _UserJobCardState extends State<_UserJobCard> {
   Widget build(BuildContext context) {
     var jobData = widget.jobDoc.data() as Map<String, dynamic>;
     String status = jobData['status'] ?? '';
+    // From user's perspective: show "Paid" once they've submitted payment
+    String displayStatus = status;
+    if (status == 'completed' && jobData['paymentSubmitted'] == true) {
+      displayStatus = 'paid';
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -377,13 +385,13 @@ class _UserJobCardState extends State<_UserJobCard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(status).withOpacity(0.1),
+                  color: _getStatusColor(displayStatus).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  _getStatusText(status),
+                  _getStatusText(displayStatus),
                   style: TextStyle(
-                    color: _getStatusColor(status),
+                    color: _getStatusColor(displayStatus),
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
@@ -502,27 +510,60 @@ class _UserJobCardState extends State<_UserJobCard> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PaymentScreen(
-                              jobId: widget.jobDoc.id,
-                              jobData: jobData,
+                  // Show Pay only if user hasn't submitted payment yet
+                  if (jobData['paymentSubmitted'] != true)
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PaymentScreen(
+                                jobId: widget.jobDoc.id,
+                                jobData: jobData,
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.payment),
-                      label: const Text('Pay'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.secondary,
-                        foregroundColor: Colors.white,
+                          );
+                        },
+                        icon: const Icon(Icons.payment),
+                        label: const Text('Pay'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.secondary),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle, color: AppColors.secondary, size: 20),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Paid',
+                                style: const TextStyle(
+                                  color: AppColors.secondary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
                 ] else ...[
                   Expanded(
                     child: Container(
@@ -600,6 +641,7 @@ class _UserJobCardState extends State<_UserJobCard> {
 
 class _ReviewDialog extends StatefulWidget {
   final String jobId;
+  final String gigId;
   final String workerId;
   final String workerName;
   final String userId;
@@ -608,6 +650,7 @@ class _ReviewDialog extends StatefulWidget {
 
   const _ReviewDialog({
     required this.jobId,
+    required this.gigId,
     required this.workerId,
     required this.workerName,
     required this.userId,
@@ -639,6 +682,7 @@ class _ReviewDialogState extends State<_ReviewDialog> {
     try {
       await _firestoreService.addReview(
         jobId: widget.jobId,
+        gigId: widget.gigId,
         workerId: widget.workerId,
         userId: widget.userId,
         userName: widget.userName,
@@ -656,7 +700,13 @@ class _ReviewDialogState extends State<_ReviewDialog> {
         );
         widget.onReviewSubmitted();
       }
-    } catch (e) {
+    } catch (e, st) {
+      developer.log(
+        'Review submit error: jobId=${widget.jobId}, gigId=${widget.gigId}, workerId=${widget.workerId}',
+        error: e,
+        stackTrace: st,
+        name: 'UserJobsScreen._submitReview',
+      );
       setState(() {
         _isSubmitting = false;
       });

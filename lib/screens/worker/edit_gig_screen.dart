@@ -24,13 +24,10 @@ class _EditGigScreenState extends State<EditGigScreen> {
   final _descriptionController = TextEditingController();
   final _hourlyRateController = TextEditingController();
   final _skillsController = TextEditingController();
-  final _requirementsController = TextEditingController();
   final FirestoreService _firestoreService = FirestoreService();
 
   String _selectedCategory = GigCategories.predefined[0];
   String _customCategory = '';
-  int _minHours = 1;
-  int _maxHours = 8;
   bool _isAvailable = true;
   bool _isLoading = false;
 
@@ -42,8 +39,6 @@ class _EditGigScreenState extends State<EditGigScreen> {
     _descriptionController.text = widget.gigData['description'] ?? '';
     _hourlyRateController.text = (widget.gigData['hourlyRate'] ?? 0).toString();
     _selectedCategory = widget.gigData['category'] ?? GigCategories.predefined[0];
-    _minHours = widget.gigData['minHours'] ?? 1;
-    _maxHours = widget.gigData['maxHours'] ?? 8;
     _isAvailable = widget.gigData['isAvailable'] ?? true;
     
     // Handle skills
@@ -52,11 +47,6 @@ class _EditGigScreenState extends State<EditGigScreen> {
       _skillsController.text = skills.join(', ');
     }
     
-    // Handle requirements
-    if (widget.gigData['requirements'] != null) {
-      List requirements = widget.gigData['requirements'] as List;
-      _requirementsController.text = requirements.join(', ');
-    }
   }
 
   @override
@@ -65,7 +55,6 @@ class _EditGigScreenState extends State<EditGigScreen> {
     _descriptionController.dispose();
     _hourlyRateController.dispose();
     _skillsController.dispose();
-    _requirementsController.dispose();
     super.dispose();
   }
 
@@ -92,10 +81,10 @@ class _EditGigScreenState extends State<EditGigScreen> {
           'description': _descriptionController.text.trim(),
           'category': _selectedCategory == 'Custom' ? _customCategory : _selectedCategory,
           'hourlyRate': double.parse(_hourlyRateController.text.trim()),
-          'minHours': _minHours,
-          'maxHours': _maxHours,
+          'minHours': 1,
+          'maxHours': 24,
           'skills': _skillsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
-          'requirements': _requirementsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+          'requirements': <String>[],
           'isAvailable': _isAvailable,
         });
 
@@ -242,101 +231,6 @@ class _EditGigScreenState extends State<EditGigScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Hours Range
-                _buildSectionTitle('Hours Range'),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBackground,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Minimum Hours'),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '$_minHours hours',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Maximum Hours'),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '$_maxHours hours',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Slider(
-                              value: _minHours.toDouble(),
-                              min: 1,
-                              max: 12,
-                              divisions: 11,
-                              activeColor: AppColors.primary,
-                              onChanged: (value) {
-                                setState(() {
-                                  _minHours = value.toInt();
-                                  if (_minHours > _maxHours) {
-                                    _maxHours = _minHours;
-                                  }
-                                });
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Slider(
-                              value: _maxHours.toDouble(),
-                              min: 1,
-                              max: 12,
-                              divisions: 11,
-                              activeColor: AppColors.primary,
-                              onChanged: (value) {
-                                setState(() {
-                                  _maxHours = value.toInt();
-                                  if (_maxHours < _minHours) {
-                                    _minHours = _maxHours;
-                                  }
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-
                 // Skills
                 _buildSectionTitle('Skills (comma separated)'),
                 const SizedBox(height: 8),
@@ -348,18 +242,6 @@ class _EditGigScreenState extends State<EditGigScreen> {
                   ),
                   validator: (value) =>
                       value?.isEmpty ?? true ? 'Please enter skills' : null,
-                ),
-                const SizedBox(height: 20),
-
-                // Requirements
-                _buildSectionTitle('Requirements (comma separated)'),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _requirementsController,
-                  decoration: _inputDecoration(
-                    'e.g., Licensed, Insured, 10+ years',
-                    Iconsax.task_square,
-                  ),
                 ),
                 const SizedBox(height: 20),
 

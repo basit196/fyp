@@ -265,23 +265,72 @@ class NotificationService {
 
   /// Mark Notification as Read
   Future<void> markAsRead(String notificationId) async {
-    await _firestore.collection('notifications').doc(notificationId).update({
-      'read': true,
+    try {
+      await _firestore.collection('notifications').doc(notificationId).update({
+        'read': true,
+      });
+    } catch (e) {
+      print('NotificationService.markAsRead error: $e');
+    }
+  }
+
+  /// Mark all notifications as read for the user (badge updates immediately via stream)
+  Future<void> markAllAsRead(String userId) async {
+    try {
+      QuerySnapshot snapshot = await _firestore
+          .collection('notifications')
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      WriteBatch batch = _firestore.batch();
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data != null && data['read'] != true) {
+          batch.update(doc.reference, {'read': true});
+        }
+      }
+      await batch.commit();
+    } catch (e) {
+      print('NotificationService.markAllAsRead error: $e');
+    }
+  }
+
+  /// Get Unread Count (one-off; for backward compat)
+  Future<int> getUnreadCount(String userId) async {
+    try {
+      QuerySnapshot snapshot = await _firestore
+          .collection('notifications')
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      int count = 0;
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data != null && data['read'] != true) count++;
+      }
+      return count;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /// Stream of unread count for app bar badge (updates when notifications are marked read)
+  Stream<int> getUnreadCountStream(String userId) {
+    return _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+      int count = 0;
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data != null && data['read'] != true) count++;
+      }
+      return count;
     });
   }
 
-  /// Get Unread Count
-  Future<int> getUnreadCount(String userId) async {
-    QuerySnapshot snapshot = await _firestore
-        .collection('notifications')
-        .where('userId', isEqualTo: userId)
-        .where('read', isEqualTo: false)
-        .get();
-
-    return snapshot.docs.length;
-  }
-
-  /// Clear All Notifications
+  /// Clear All Notifications (delete)
   Future<void> clearAllNotifications(String userId) async {
     QuerySnapshot snapshot = await _firestore
         .collection('notifications')

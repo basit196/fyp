@@ -137,29 +137,33 @@ class ChatService {
         .snapshots();
   }
 
-  /// Mark Messages as Read
+  /// Mark Messages as Read - reset unread count first so UI updates immediately
   Future<void> markMessagesAsRead(String chatRoomId, String userId) async {
     try {
-      // Get unread messages
-      QuerySnapshot unreadMessages = await _firestore
-          .collection('chats')
-          .doc(chatRoomId)
-          .collection('messages')
-          .where('senderId', isNotEqualTo: userId)
-          .where('isRead', isEqualTo: false)
-          .get();
-
-      // Update all to read
-      WriteBatch batch = _firestore.batch();
-      for (var doc in unreadMessages.docs) {
-        batch.update(doc.reference, {'isRead': true});
-      }
-      await batch.commit();
-
-      // Reset unread count
+      // 1. Reset unread count first so chat list and app bar badge update right away
       await _firestore.collection('chats').doc(chatRoomId).update({
         'unreadCount_$userId': 0,
       });
+
+      // 2. Mark message docs as read (fetch all and filter client-side to avoid compound index)
+      QuerySnapshot allMessages = await _firestore
+          .collection('chats')
+          .doc(chatRoomId)
+          .collection('messages')
+          .limit(100)
+          .get();
+
+      WriteBatch batch = _firestore.batch();
+      for (var doc in allMessages.docs) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data == null) continue;
+        final senderId = data['senderId']?.toString() ?? '';
+        final isRead = data['isRead'] == true;
+        if (senderId != userId && !isRead) {
+          batch.update(doc.reference, {'isRead': true});
+        }
+      }
+      await batch.commit();
     } catch (e) {
       print('Error marking messages as read: $e');
     }
@@ -175,7 +179,7 @@ class ChatService {
         .snapshots();
   }
 
-  /// Get Unread Message Count
+  /// Get Unread Message Count for one chat
   Future<int> getUnreadMessageCount(String chatRoomId, String userId) async {
     try {
       DocumentSnapshot chatDoc =
@@ -188,6 +192,22 @@ class ChatService {
     } catch (e) {
       return 0;
     }
+  }
+
+  /// Stream of total unread count across all chats for the user (for app bar badge)
+  Stream<int> getTotalUnreadCountStream(String userId) {
+    return _firestore
+        .collection('chats')
+        .where('participants', arrayContains: userId)
+        .snapshots()
+        .map((snapshot) {
+      int total = 0;
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        total += ((data != null ? data['unreadCount_$userId'] : null) as num?)?.toInt() ?? 0;
+      }
+      return total;
+    });
   }
 
   /// Delete Chat Room
