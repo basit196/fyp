@@ -22,7 +22,7 @@ class _AISearchScreenState extends State<AISearchScreen> {
 
   // Replace with your actual Gemini API key
   // You can get it from: https://makersuite.google.com/app/apikey
-  static const String _geminiApiKey = 'AIzaSyBkzgubUQx0o6JfiZYSbqPFuhf8iGAPEBA';
+  static const String _geminiApiKey = 'AQ.Ab8RN6IrQO9ZcHnWl0AEvySTBKDXfO515_E0nPDxA8J-mgOvmA';
 
   @override
   void dispose() {
@@ -92,7 +92,7 @@ If no services match, return an empty array: []
       
       // Make HTTP request to Gemini API
       final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=$_geminiApiKey'
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$_geminiApiKey'
       );
       
       final requestBody = {

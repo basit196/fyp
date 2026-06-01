@@ -62,7 +62,7 @@ class WelcomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               _RoleCard(
-                title: 'I Need a Worker',
+                title: 'I\'m a Users',
                 subtitle: 'Find and hire skilled professionals',
                 icon: Icons.search,
                 color: AppColors.secondary,
