@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
@@ -78,17 +79,18 @@ class AuthWrapper extends StatelessWidget {
         // User is logged in
         if (snapshot.hasData && snapshot.data != null) {
           // Check user role and navigate accordingly
-          return FutureBuilder<String?>(
-            future: AuthService().getUserRole(snapshot.data!.uid),
-            builder: (context, roleSnapshot) {
-              if (roleSnapshot.connectionState == ConnectionState.waiting) {
+          return StreamBuilder<DocumentSnapshot>(
+            stream: AuthService().getUserDocumentStream(snapshot.data!.uid),
+            builder: (context, userSnapshot) {
+              if (userSnapshot.connectionState == ConnectionState.waiting) {
                 return const Scaffold(
                   body: Center(child: CircularProgressIndicator()),
                 );
               }
 
               // Navigate based on role from Firestore (default to user to avoid worker "profile not found")
-              final role = roleSnapshot.data;
+              final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
+              final role = userData?['role'] as String?;
               if (role == 'worker') {
                 return const WorkerDashboard();
               } else {

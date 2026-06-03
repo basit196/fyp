@@ -51,6 +51,11 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
     }
   }
 
+  Future<void> _refreshGigs() async {
+    setState(() {});
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+  }
+
   // Get list of predefined category names
   List<String> get _predefinedCategories {
     return WorkerCategories.categories.map((cat) => cat['name'] as String).toList();
@@ -576,26 +581,44 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
               stream: _getGigsStream(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return RefreshIndicator(
+                    onRefresh: _refreshGigs,
+                    color: AppColors.primary,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 220),
+                        Center(child: CircularProgressIndicator()),
+                      ],
+                    ),
+                  );
                 }
 
                 if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                  return RefreshIndicator(
+                    onRefresh: _refreshGigs,
+                    color: AppColors.primary,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
                       children: [
-                        Icon(
-                          Iconsax.warning_2,
-                          size: 64,
-                          color: AppColors.error,
+                        const SizedBox(height: 160),
+                        Center(
+                          child: Icon(
+                            Iconsax.warning_2,
+                            size: 64,
+                            color: AppColors.error,
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        Text(
-                          'Error loading services',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                        const Center(
+                          child: Text(
+                            'Error loading services',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -613,30 +636,39 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                  return RefreshIndicator(
+                    onRefresh: _refreshGigs,
+                    color: AppColors.primary,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       children: [
-                        Icon(
-                          Iconsax.briefcase,
-                          size: 80,
-                          color: AppColors.textSecondary.withOpacity(0.3),
+                        const SizedBox(height: 160),
+                        Center(
+                          child: Icon(
+                            Iconsax.briefcase,
+                            size: 80,
+                            color: AppColors.textSecondary.withOpacity(0.3),
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        const Text(
-                          'No services available',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                        const Center(
+                          child: Text(
+                            'No services available',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'Check back later for new services',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
+                        const Center(
+                          child: Text(
+                            'Check back later for new services',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ),
                       ],
@@ -670,29 +702,38 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
                 });
 
                 if (filteredDocs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                  return RefreshIndicator(
+                    onRefresh: _refreshGigs,
+                    color: AppColors.primary,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       children: [
-                        Icon(
-                          Iconsax.search_normal,
-                          size: 80,
-                          color: AppColors.textSecondary.withOpacity(0.3),
+                        const SizedBox(height: 160),
+                        Center(
+                          child: Icon(
+                            Iconsax.search_normal,
+                            size: 80,
+                            color: AppColors.textSecondary.withOpacity(0.3),
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        const Text(
-                          'No services found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: AppColors.textSecondary,
+                        const Center(
+                          child: Text(
+                            'No services found',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'Try a different search or category',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
+                        const Center(
+                          child: Text(
+                            'Try a different search or category',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ),
                       ],
@@ -738,20 +779,25 @@ class _BrowseGigsScreenState extends State<BrowseGigsScreen> {
                     const SizedBox(height: 8),
                     // Gigs List
                     Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.only(
-                          left: 16,
-                          right: 16,
-                          bottom: 100,
+                      child: RefreshIndicator(
+                        onRefresh: _refreshGigs,
+                        color: AppColors.primary,
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(
+                            left: 16,
+                            right: 16,
+                            bottom: 100,
+                          ),
+                          itemCount: filteredDocs.length,
+                          itemBuilder: (context, index) {
+                            final gig = _documentToGig(filteredDocs[index]);
+                            return _GigCard(
+                              gig: gig,
+                              gigData: filteredDocs[index].data() as Map<String, dynamic>,
+                            );
+                          },
                         ),
-                        itemCount: filteredDocs.length,
-                        itemBuilder: (context, index) {
-                          final gig = _documentToGig(filteredDocs[index]);
-                          return _GigCard(
-                            gig: gig,
-                            gigData: filteredDocs[index].data() as Map<String, dynamic>,
-                          );
-                        },
                       ),
                     ),
                   ],
@@ -1010,4 +1056,3 @@ class _GigCard extends StatelessWidget {
     );
   }
 }
-

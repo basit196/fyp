@@ -25,6 +25,11 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   // Category is only on gigs; workers are shown without category filter
   List<Worker> get filteredWorkers => SampleData.workers;
 
+  Future<void> _refreshWorkers() async {
+    setState(() {});
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -173,16 +178,21 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.only(
-                left: 16,
-                right: 16,
-                bottom: 100,
+            child: RefreshIndicator(
+              onRefresh: _refreshWorkers,
+              color: AppColors.primary,
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: 100,
+                ),
+                itemCount: filteredWorkers.length,
+                itemBuilder: (context, index) {
+                  return _WorkerCard(worker: filteredWorkers[index]);
+                },
               ),
-              itemCount: filteredWorkers.length,
-              itemBuilder: (context, index) {
-                return _WorkerCard(worker: filteredWorkers[index]);
-              },
             ),
           ),
         ],
@@ -347,4 +357,3 @@ class _WorkerCard extends StatelessWidget {
     );
   }
 }
-

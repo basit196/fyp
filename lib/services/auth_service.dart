@@ -164,6 +164,11 @@ class AuthService {
     }
   }
 
+  // Watch user data so role changes made during login are reflected immediately
+  Stream<DocumentSnapshot> getUserDocumentStream(String uid) {
+    return _firestore.collection('users').doc(uid).snapshots();
+  }
+
   // Get User Data
   Future<Map<String, dynamic>?> getUserData(String uid) async {
     try {
@@ -222,6 +227,47 @@ class AuthService {
     }
   }
 
+  // Create the worker profile shell needed by the worker dashboard.
+  Future<void> ensureWorkerProfile(String uid) async {
+    final workerRef = _firestore.collection('workers').doc(uid);
+    final workerDoc = await workerRef.get();
+
+    if (workerDoc.exists) {
+      return;
+    }
+
+    final user = currentUser;
+    final userData = await getUserData(uid);
+    final name = userData?['name'] ??
+        user?.displayName ??
+        user?.email?.split('@').first ??
+        'Worker';
+
+    await workerRef.set({
+      'id': uid,
+      'name': name,
+      'email': userData?['email'] ?? user?.email ?? '',
+      'phone': userData?['phone'] ?? user?.phoneNumber ?? '',
+      'profileImage': user?.photoURL ??
+          'https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&background=2563EB&color=fff',
+      'description': '',
+      'rating': 0.0,
+      'totalJobs': 0,
+      'skills': <String>[],
+      'location': '',
+      'latitude': null,
+      'longitude': null,
+      'isAvailable': true,
+      'level': 'newbie',
+      'yearsOfExperience': 0,
+      'completedProjects': 0,
+      'successRate': 100.0,
+      'portfolio': <String>[],
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   // Handle Auth Exceptions
   String _handleAuthException(FirebaseAuthException e) {
     switch (e.code) {
@@ -250,5 +296,4 @@ class AuthService {
     }
   }
 }
-
 

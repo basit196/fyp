@@ -125,13 +125,19 @@ class _SignupScreenState extends State<SignupScreen> {
         role: widget.userRole,
       );
 
-      if (userCredential != null && mounted) {
+      if (userCredential != null) {
+        if (widget.userRole == 'worker') {
+          await _authService.ensureWorkerProfile(userCredential.user!.uid);
+        }
+
         // Initialize notifications
         await _notificationService.initialize();
         await _notificationService.saveTokenToFirestore(
           userCredential.user!.uid,
           widget.userRole,
         );
+
+        if (!mounted) return;
 
         setState(() {
           _isGoogleLoading = false;
@@ -618,4 +624,3 @@ class _SocialButton extends StatelessWidget {
     );
   }
 }
-

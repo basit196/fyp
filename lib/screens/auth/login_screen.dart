@@ -50,15 +50,21 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passwordController.text.trim(),
         );
 
-        if (userCredential != null && mounted) {
+        if (userCredential != null) {
           // Persist the role they chose at login (User vs Worker) so restart shows correct side
           await _authService.updateUserRole(userCredential.user!.uid, widget.userRole);
+
+          if (widget.userRole == 'worker') {
+            await _authService.ensureWorkerProfile(userCredential.user!.uid);
+          }
 
           // Save FCM token for notifications
           await _notificationService.saveTokenToFirestore(
             userCredential.user!.uid,
             widget.userRole,
           );
+
+          if (!mounted) return;
 
           setState(() {
             _isLoading = false;
@@ -79,12 +85,12 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } catch (e) {
         log(e.toString());
-        setState(() {
-          _isLoading = false;
-        });
-
         // Show error message
         if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(e.toString()),
@@ -108,15 +114,21 @@ class _LoginScreenState extends State<LoginScreen> {
         role: widget.userRole,
       );
 
-      if (userCredential != null && mounted) {
+      if (userCredential != null) {
         // Persist the role they chose so app restart shows correct side (same as email login)
         await _authService.updateUserRole(userCredential.user!.uid, widget.userRole);
+
+        if (widget.userRole == 'worker') {
+          await _authService.ensureWorkerProfile(userCredential.user!.uid);
+        }
 
         // Save FCM token for notifications
         await _notificationService.saveTokenToFirestore(
           userCredential.user!.uid,
           widget.userRole,
         );
+
+        if (!mounted) return;
 
         setState(() {
           _isGoogleLoading = false;
@@ -136,18 +148,20 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } else {
         // User canceled
-        setState(() {
-          _isGoogleLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isGoogleLoading = false;
+          });
+        }
       }
     } catch (e) {
       log(e.toString());
-      setState(() {
-        _isGoogleLoading = false;
-      });
-
       // Show error message
       if (mounted) {
+        setState(() {
+          _isGoogleLoading = false;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString()),

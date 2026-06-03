@@ -3,11 +3,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:http/http.dart' as http;
 import '../utils/constants.dart';
+import 'job_service.dart';
 
-/// Handles Stripe Payment Sheet (flutter_stripe SDK only) and records payments in Firestore with status pending.
-/// No Vercel/website: PaymentIntent is created via Stripe API from the app. Admin can later approve/deny.
+/// Handles Stripe Payment Sheet (flutter_stripe SDK only) and records payments in Firestore.
+/// No Vercel/website: PaymentIntent is created via Stripe API from the app.
 class PaymentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final JobService _jobService = JobService();
 
   static const String _stripeApiUrl = 'https://api.stripe.com/v1/payment_intents';
 
@@ -50,9 +52,8 @@ class PaymentService {
     };
   }
 
-  /// Records a payment in Firestore with status 'pending' (admin approves/denies later).
-  /// Also marks the job as payment submitted so the UI hides the Pay button.
-  Future<void> recordPaymentPending({
+  /// Records a successful payment and marks the job as paid so worker earnings update.
+  Future<void> recordPaymentCompleted({
     required String jobId,
     required String userId,
     required String workerId,
@@ -69,23 +70,19 @@ class PaymentService {
       'stripePaymentIntentId': paymentIntentId,
       'amount': amount,
       'currency': 'usd',
-      'status': 'pending', // admin will set to 'approved' or 'denied'
+      'status': 'approved',
       'userName': userName,
       'workerName': workerName,
       'category': category,
+      'approvedAt': FieldValue.serverTimestamp(),
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
-    // Mark job so UI shows "Payment pending" instead of Pay button
-    await _firestore.collection('jobs').doc(jobId).update({
-      'paymentSubmitted': true,
-      'paymentSubmittedAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    await _jobService.markAsPaid(jobId, workerId, userId, 'Stripe');
   }
 
-  /// Runs the full flow: create PaymentIntent, show Payment Sheet, then record in DB with status pending.
+  /// Runs the full flow: create PaymentIntent, show Payment Sheet, then record and credit the worker.
   Future<void> payWithStripe({
     required String jobId,
     required String userId,
@@ -124,7 +121,7 @@ class PaymentService {
 
     await Stripe.instance.presentPaymentSheet();
 
-    await recordPaymentPending(
+    await recordPaymentCompleted(
       jobId: jobId,
       userId: userId,
       workerId: workerId,

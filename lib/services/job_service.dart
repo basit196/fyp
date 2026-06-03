@@ -123,22 +123,42 @@ class JobService {
   /// Mark Job as Paid
   Future<void> markAsPaid(String jobId, String workerId, String userId, String paymentMethod) async {
     try {
-      await _firestore.collection('jobs').doc(jobId).update({
-        'status': 'paid',
-        'paidAt': FieldValue.serverTimestamp(),
-        'paymentMethod': paymentMethod,
-        'updatedAt': FieldValue.serverTimestamp(),
+      final jobRef = _firestore.collection('jobs').doc(jobId);
+      final shouldCreditWorker = await _firestore.runTransaction<bool>((transaction) async {
+        final jobDoc = await transaction.get(jobRef);
+        final jobData = jobDoc.data() as Map<String, dynamic>?;
+
+        if (!jobDoc.exists || jobData == null) {
+          throw 'Job not found';
+        }
+
+        if (jobData['status'] == 'paid') {
+          return false;
+        }
+
+        transaction.update(jobRef, {
+          'status': 'paid',
+          'paidAt': FieldValue.serverTimestamp(),
+          'paymentMethod': paymentMethod,
+          'paymentSubmitted': true,
+          'paymentSubmittedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        return true;
       });
 
       // Send notification to worker
-      await _notificationService.sendPaymentReceivedNotification(
-        workerId: workerId,
-        userId: userId,
-        jobId: jobId,
-      );
+      if (shouldCreditWorker) {
+        await _notificationService.sendPaymentReceivedNotification(
+          workerId: workerId,
+          userId: userId,
+          jobId: jobId,
+        );
 
-      // Update worker earnings
-      await _updateWorkerEarnings(jobId);
+        // Update worker earnings
+        await _updateWorkerEarnings(jobId);
+      }
     } catch (e) {
       throw 'Error processing payment: $e';
     }
@@ -158,7 +178,9 @@ class JobService {
           DocumentSnapshot workerDoc = await transaction.get(workerRef);
           
           if (workerDoc.exists) {
-            double currentEarnings = (workerDoc.get('totalEarnings') ?? 0).toDouble();
+            final workerData = workerDoc.data() as Map<String, dynamic>?;
+            double currentEarnings =
+                (workerData?['totalEarnings'] ?? 0).toDouble();
             transaction.update(workerRef, {
               'totalEarnings': currentEarnings + totalCost,
               'updatedAt': FieldValue.serverTimestamp(),
@@ -278,5 +300,3 @@ class JobService {
     }
   }
 }
-
-

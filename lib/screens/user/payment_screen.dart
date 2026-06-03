@@ -53,11 +53,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 Icon(Icons.check_circle,
                     color: AppColors.secondary, size: 32),
                 SizedBox(width: 12),
-                Text('Payment Submitted'),
+                Text('Payment Completed'),
               ],
             ),
             content: const Text(
-              'Your payment has been submitted successfully. It is pending admin approval. You will be notified once it is approved. Thank you for using SkillLink!',
+              'Your payment was completed successfully. The worker earnings have been updated. Thank you for using SkillLink!',
             ),
             actions: [
               TextButton(
@@ -215,7 +215,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Pay securely with card, Apple Pay, or Google Pay. Payment will be recorded and pending admin approval.',
+                'Pay securely with card, Apple Pay, or Google Pay. Payment will be recorded immediately after confirmation.',
                 style: TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,

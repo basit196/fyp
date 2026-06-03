@@ -231,6 +231,22 @@ class _ChatScreenState extends State<ChatScreen> {
                 //            oldest messages last in list = appear at top ✓
                 messages.sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
+                final hasUnreadIncomingMessages = messages.any(
+                  (message) =>
+                      message.senderId != _currentUserId && !message.isRead,
+                );
+
+                if (hasUnreadIncomingMessages) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      _chatService.markMessagesAsRead(
+                        _chatRoomId,
+                        _currentUserId,
+                      );
+                    }
+                  });
+                }
+
                 // Auto-scroll to bottom when new message arrives
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (_scrollController.hasClients && messages.isNotEmpty) {
@@ -463,5 +479,4 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 }
-
 

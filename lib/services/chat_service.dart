@@ -137,15 +137,10 @@ class ChatService {
         .snapshots();
   }
 
-  /// Mark Messages as Read - reset unread count first so UI updates immediately
+  /// Mark Messages as Read
   Future<void> markMessagesAsRead(String chatRoomId, String userId) async {
     try {
-      // 1. Reset unread count first so chat list and app bar badge update right away
-      await _firestore.collection('chats').doc(chatRoomId).update({
-        'unreadCount_$userId': 0,
-      });
-
-      // 2. Mark message docs as read (fetch all and filter client-side to avoid compound index)
+      // Mark message docs as read first so open chat screens receive tick updates.
       QuerySnapshot allMessages = await _firestore
           .collection('chats')
           .doc(chatRoomId)
@@ -164,6 +159,12 @@ class ChatService {
         }
       }
       await batch.commit();
+
+      // Reset unread count after message updates. set(...merge) also works for
+      // older chat metadata documents that may not have this field yet.
+      await _firestore.collection('chats').doc(chatRoomId).set({
+        'unreadCount_$userId': 0,
+      }, SetOptions(merge: true));
     } catch (e) {
       print('Error marking messages as read: $e');
     }
@@ -240,5 +241,4 @@ class ChatService {
     return doc.exists;
   }
 }
-
 

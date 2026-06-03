@@ -157,6 +157,11 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
   final JobService _jobService = JobService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  Future<void> _refreshDashboard() async {
+    setState(() {});
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = _auth.currentUser;
@@ -303,29 +308,38 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
           }
 
           if (profileSnapshot.hasError || !profileSnapshot.hasData || !profileSnapshot.data!.exists) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            return RefreshIndicator(
+              onRefresh: _refreshDashboard,
+              color: AppColors.primary,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 children: [
+                  const SizedBox(height: 160),
                   const Icon(Icons.error_outline, size: 64, color: AppColors.error),
                   const SizedBox(height: 16),
                   const Text(
                     'Profile not found',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  const Text('Please complete your profile first'),
+                  const Text(
+                    'Please complete your profile first',
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => WorkerProfileScreen(),
-                        ),
-                      );
-                    },
-                    child: const Text('Go to Profile'),
+                  Center(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => WorkerProfileScreen(),
+                          ),
+                        );
+                      },
+                      child: const Text('Go to Profile'),
+                    ),
                   ),
                 ],
               ),
@@ -351,7 +365,11 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
               final totalJobs = stats['totalJobs'] ?? 0;
               final totalEarnings = (stats['totalEarnings'] ?? 0.0).toDouble();
 
-          return SingleChildScrollView(
+          return RefreshIndicator(
+            onRefresh: _refreshDashboard,
+            color: AppColors.primary,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -611,6 +629,7 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
                 ),
                 const SizedBox(height: 100),
               ],
+            ),
             ),
           );
             },
@@ -954,4 +973,3 @@ class _JobRequestCardState extends State<_JobRequestCard> {
     );
   }
 }
-
